@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #071016;
+  --panel: rgba(10, 18, 24, 0.72);
+  --line: rgba(214, 232, 226, 0.12);
+  --text: #edf6f3;
+  --muted: #93a8a2;
+  --gold: #e7c37a;
+  --mint: #7dffe1;
+}
+
+@theme inline {
+  --color-background: var(--ink);
+  --color-foreground: var(--text);
+  --font-sans: "Avenir Next", "Segoe UI", Helvetica, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(125, 255, 225, 0.14), transparent 55%),
+    radial-gradient(900px 500px at 110% 0%, rgba(231, 195, 122, 0.16), transparent 50%),
+    radial-gradient(700px 400px at 50% 120%, rgba(88, 132, 255, 0.12), transparent 50%),
+    var(--ink);
+  font-family: var(--font-geist-sans), Helvetica, sans-serif;
+}
+
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+.holo-text {
+  background: linear-gradient(
+    110deg,
+    #fff6d6 0%,
+    #e7c37a 18%,
+    #7dffe1 42%,
+    #ffffff 58%,
+    #c7a0ff 78%,
+    #e7c37a 100%
+  );
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: holo-shift 8s ease infinite;
+}
+
+.holo-border {
+  position: relative;
+}
+
+.holo-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    130deg,
+    rgba(231, 195, 122, 0.85),
+    rgba(125, 255, 225, 0.45),
+    rgba(199, 160, 255, 0.7),
+    rgba(231, 195, 122, 0.4)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(22px);
+}
+
+.scan-frame {
+  box-shadow:
+    0 0 0 1px rgba(125, 255, 225, 0.35),
+    0 0 40px rgba(125, 255, 225, 0.12),
+    inset 0 0 40px rgba(125, 255, 225, 0.05);
+}
+
+@keyframes holo-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 40%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.pulse-ring {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(237, 246, 243, 0.16);
+  border-radius: 99px;
+}
