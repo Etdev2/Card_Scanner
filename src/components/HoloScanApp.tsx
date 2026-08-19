@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lookupCard } from "@/lib/lookup";
-import { categoryLabel } from "@/lib/query";
-import { formatMoney, formatSoldDate } from "@/lib/stats";
+import { formatMoney } from "@/lib/stats";
 import {
   CONDITIONS,
   type CardCondition,
@@ -12,6 +11,8 @@ import {
 } from "@/lib/types";
 import { soldSearchUrl } from "@/lib/ebay";
 import { Scanner } from "./Scanner";
+import { ResultsCard } from "./ResultsCard";
+import { AddToCollection } from "./AddToCollection";
 
 const EXAMPLES = [
   "Charizard Base Set Holo 4/102",
@@ -32,11 +33,22 @@ export function HoloScanApp() {
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState<ScanResult[]>([]);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const ebayUrl = useMemo(
     () => (result ? soldSearchUrl(result.card.query) : null),
     [result],
   );
+
+  // Keep the phone sheet from trapping the page behind it.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen]);
 
   async function runLookup(nextQuery: string, nextOcr = ocrText) {
     const trimmed = nextQuery.trim();
@@ -50,18 +62,21 @@ export function HoloScanApp() {
         condition,
       });
       setResult(next);
+      setSheetOpen(true);
       setHistory((current) =>
-        [next, ...current.filter((item) => item.card.query !== next.card.query)].slice(
-          0,
-          8,
-        ),
+        [
+          next,
+          ...current.filter((item) => item.card.query !== next.card.query),
+        ].slice(0, 8),
       );
       setStatus("idle");
       setMessage("");
     } catch (error) {
       setStatus("error");
       setMessage(
-        error instanceof Error ? error.message : "Lookup failed. Try another query.",
+        error instanceof Error
+          ? error.message
+          : "Lookup failed. Try another query.",
       );
     }
   }
@@ -78,33 +93,43 @@ export function HoloScanApp() {
     void runLookup(hit.query);
   }
 
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-5 py-6 md:px-8 md:py-10">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="mb-2 text-xs uppercase tracking-[0.28em] text-[#7dffe1]/80">
-            TCG + sports comps
-          </p>
-          <h1 className="font-display text-5xl tracking-tight md:text-6xl">
-            <span className="holo-text">HoloScan</span>
-          </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-[#93a8a2] md:text-base">
-            Scan a Pokémon, Magic, Yu-Gi-Oh!, or sports card. We read the name,
-            then estimate value from the latest eBay sold listings.
-          </p>
-        </div>
-        <div className="glass holo-border rounded-2xl px-4 py-3 text-right">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#93a8a2]">
-            Estimate source
-          </p>
-          <p className="mt-1 text-sm text-[#edf6f3]">
-            eBay sold · median of recent comps
-          </p>
-        </div>
-      </header>
+  const results = result ? (
+    <ResultsCard
+      result={result}
+      preview={preview}
+      ebayUrl={ebayUrl}
+      onSelectHit={selectHit}
+      actions={
+        <AddToCollection
+          key={`${result.card.query}:${result.estimate.estimated ?? "na"}`}
+          result={result}
+          preview={preview}
+          condition={condition}
+        />
+      }
+    />
+  ) : (
+    <EmptyState />
+  );
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">
-        <section className="space-y-4">
+  return (
+    <div className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-5 md:px-8 md:py-8">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)]">
+        <section className="space-y-3 sm:space-y-4">
+          <div className="hidden md:block">
+            <p className="text-xs uppercase tracking-[0.28em] text-[#7dffe1]/80">
+              TCG + sports comps
+            </p>
+            <h1 className="font-display mt-1 text-4xl tracking-tight lg:text-5xl">
+              Point, snap, <span className="holo-text">price</span>.
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[#93a8a2]">
+              Scan a Pokémon, Magic, Yu-Gi-Oh!, or sports card. HoloScan reads
+              the name, then estimates value from the latest eBay sold listings
+              — and saves it to your collection.
+            </p>
+          </div>
+
           <Scanner
             busy={status === "working"}
             onRecognized={onRecognized}
@@ -112,38 +137,43 @@ export function HoloScanApp() {
           />
 
           <form
-            className="glass holo-border rounded-3xl p-4"
+            className="glass holo-border rounded-3xl p-3 sm:p-4"
             onSubmit={(event) => {
               event.preventDefault();
               void runLookup(query);
             }}
           >
-            <label className="text-[11px] uppercase tracking-[0.22em] text-[#93a8a2]">
+            <label
+              htmlFor="holoscan-query"
+              className="text-[11px] uppercase tracking-[0.22em] text-[#93a8a2]"
+            >
               Card search
             </label>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-3">
               <input
+                id="holoscan-query"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Charizard Base Set, 2023 Prizm Wembanyama RC…"
-                className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm outline-none ring-[#7dffe1]/40 placeholder:text-[#93a8a2]/70 focus:ring-2"
+                placeholder="Charizard Base Set, Prizm Wembanyama RC…"
+                enterKeyHint="search"
+                className="min-h-11 min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-base outline-none ring-[#7dffe1]/40 placeholder:text-[#93a8a2]/70 focus:ring-2"
               />
               <button
                 type="submit"
                 disabled={status === "working"}
-                className="rounded-2xl bg-[#edf6f3] px-5 py-3 text-sm font-semibold text-[#071016] transition hover:bg-white disabled:opacity-60"
+                className="tap tap-target flex items-center justify-center rounded-2xl bg-[#edf6f3] px-5 text-sm font-semibold text-[#071016] transition hover:bg-white disabled:opacity-60"
               >
-                Get value
+                {status === "working" ? "Pricing…" : "Get value"}
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="chip-rail mt-3">
               {CONDITIONS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setCondition(item.id)}
-                  className={`rounded-full px-3 py-1.5 text-xs ${
+                  className={`tap rounded-full px-3 py-2 text-xs ${
                     condition === item.id
                       ? "bg-[#7dffe1] text-[#071016]"
                       : "border border-white/10 text-[#93a8a2] hover:border-white/25"
@@ -155,7 +185,7 @@ export function HoloScanApp() {
             </div>
           </form>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="chip-rail">
             {EXAMPLES.map((example) => (
               <button
                 key={example}
@@ -164,37 +194,26 @@ export function HoloScanApp() {
                   setPreview(null);
                   void runLookup(example);
                 }}
-                className="rounded-full border border-white/10 px-3 py-1.5 text-left text-xs text-[#c9d9d4] hover:border-[#7dffe1]/40 hover:text-white"
+                className="tap rounded-full border border-white/10 px-3 py-2 text-left text-xs text-[#c9d9d4] hover:border-[#7dffe1]/40 hover:text-white"
               >
                 {example}
               </button>
             ))}
           </div>
-        </section>
 
-        <section className="space-y-4">
           {message ? (
-            <p className="text-sm text-[#7dffe1]">{message}</p>
+            <p
+              role="status"
+              className={`text-sm ${
+                status === "error" ? "text-[#e7c37a]" : "text-[#7dffe1]"
+              }`}
+            >
+              {message}
+            </p>
           ) : null}
 
-          {result ? (
-            <ResultsCard
-              result={result}
-              preview={preview}
-              ebayUrl={ebayUrl}
-              onSelectHit={selectHit}
-            />
-          ) : (
-            <EmptyState />
-          )}
-
-          <footer className="px-1 pb-2 text-xs leading-5 text-[#93a8a2]/80">
-            Estimates are unofficial comps, not an appraisal. eBay sold data
-            depends on public listing pages and can miss Best Offers or lots.
-          </footer>
-
           {history.length > 1 ? (
-            <div className="glass rounded-3xl p-4">
+            <div className="glass rounded-3xl p-3 sm:p-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-[#93a8a2]">
                 Recent scans
               </p>
@@ -206,8 +225,9 @@ export function HoloScanApp() {
                     onClick={() => {
                       setResult(item);
                       setQuery(item.card.query);
+                      setSheetOpen(true);
                     }}
-                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/5 px-3 py-2 text-left hover:border-white/15"
+                    className="tap tap-target flex w-full items-center justify-between gap-3 rounded-2xl border border-white/5 px-3 py-2 text-left hover:border-white/15"
                   >
                     <span className="truncate text-sm">{item.card.name}</span>
                     <span className="text-sm text-[#e7c37a]">
@@ -219,181 +239,72 @@ export function HoloScanApp() {
             </div>
           ) : null}
         </section>
+
+        {/* Phone: results arrive as a compact sheet. Tablet/desktop: a column. */}
+        <section
+          className={`${
+            sheetOpen && result
+              ? "fixed inset-x-0 bottom-0 z-40 max-h-[82dvh] overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-white/10 bg-[#071016]/95 px-3 pb-[calc(96px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sheet-in"
+              : "hidden"
+          } lg:static lg:z-auto lg:block lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-0 lg:backdrop-blur-none`}
+        >
+          {sheetOpen && result ? (
+            <div className="sticky top-0 z-10 -mx-3 mb-2 flex items-center justify-between gap-3 bg-[#071016]/95 px-3 py-2 lg:hidden">
+              <span className="mx-auto h-1.5 w-10 rounded-full bg-white/25" />
+              <button
+                type="button"
+                onClick={() => setSheetOpen(false)}
+                className="tap tap-target absolute right-3 flex items-center rounded-full border border-white/15 px-3 text-xs text-[#c9d9d4]"
+              >
+                Close
+              </button>
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            {results}
+
+            <footer className="px-1 pb-2 text-xs leading-5 text-[#93a8a2]/80">
+              Estimates are unofficial comps, not an appraisal. eBay sold data
+              depends on public listing pages and can miss Best Offers or lots.
+            </footer>
+          </div>
+        </section>
       </div>
+
+      {/* Phone: re-open the last result without re-scanning. */}
+      {result && !sheetOpen ? (
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="tap fixed inset-x-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-30 flex items-center justify-between gap-3 rounded-2xl border border-[#7dffe1]/30 bg-[#0b1a22]/95 px-4 py-3 text-left backdrop-blur-xl lg:hidden"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm">
+            {result.card.name}
+          </span>
+          <span className="text-sm font-semibold text-[#e7c37a]">
+            {formatMoney(result.estimate.estimated)}
+          </span>
+        </button>
+      ) : null}
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="glass holo-border rounded-[28px] px-6 py-14 text-center">
+    <div className="glass holo-border rounded-[28px] px-6 py-10 text-center md:py-14">
       <p className="text-xs uppercase tracking-[0.28em] text-[#7dffe1]/80">
         Waiting for a card
       </p>
-      <h2 className="font-display mt-3 text-3xl">Point, snap, price.</h2>
+      <h2 className="font-display mt-3 text-2xl md:text-3xl">
+        Point, snap, price.
+      </h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#93a8a2]">
-        Use the camera or upload a photo. HoloScan OCRs the card, matches TCG
-        catalogs when it can, then reads the newest eBay sold comps for an
-        estimated market value.
+        Use the camera or pick a photo from your camera roll. HoloScan OCRs the
+        card, matches TCG catalogs when it can, reads the newest eBay sold
+        comps, then lets you save it to your collection.
       </p>
-    </div>
-  );
-}
-
-function ResultsCard({
-  result,
-  preview,
-  ebayUrl,
-  onSelectHit,
-}: {
-  result: ScanResult;
-  preview: string | null;
-  ebayUrl: string | null;
-  onSelectHit: (hit: IdentifiedCard) => void;
-}) {
-  const { card, estimate, sales } = result;
-  const sourceLabel =
-    estimate.source === "ebay-sold"
-      ? "Median of recent eBay sold listings"
-      : estimate.source === "ebay-active"
-        ? "Median of current eBay asking prices"
-        : "Catalog market price";
-
-  return (
-    <div className="glass holo-border overflow-hidden rounded-[28px]">
-      <div className="grid gap-0 md:grid-cols-[160px_minmax(0,1fr)]">
-        <div className="relative min-h-44 bg-black/40">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={card.imageUrl || preview || "/window.svg"}
-            alt={card.name}
-            className="h-full w-full object-cover"
-          />
-        </div>
-        <div className="p-5 md:p-6">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#7dffe1]/80">
-            {categoryLabel(card.category)}
-            {card.details ? ` · ${card.details}` : ""}
-          </p>
-          <h2 className="mt-2 font-display text-3xl leading-none">{card.name}</h2>
-          <p className="mt-4 text-[11px] uppercase tracking-[0.22em] text-[#93a8a2]">
-            Estimated value
-          </p>
-          <p className="holo-text font-display mt-1 text-5xl md:text-6xl">
-            {formatMoney(estimate.estimated)}
-          </p>
-          <p className="mt-2 text-sm text-[#93a8a2]">{sourceLabel}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-4">
-        <Stat label="Last sold" value={formatMoney(estimate.lastSold)} />
-        <Stat label="Median" value={formatMoney(estimate.median)} />
-        <Stat label="Range" value={`${formatMoney(estimate.low)} – ${formatMoney(estimate.high)}`} />
-        <Stat
-          label="Comps"
-          value={estimate.count ? `${estimate.count}` : "0"}
-        />
-      </div>
-
-      {card.catalogPrice ? (
-        <p className="border-b border-white/10 px-5 py-3 text-sm text-[#c9d9d4]">
-          Catalog: {formatMoney(card.catalogPrice)}
-          {card.catalogLabel ? ` · ${card.catalogLabel}` : ""}
-        </p>
-      ) : null}
-
-      {result.catalogHits.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto px-5 py-3">
-          {result.catalogHits.map((hit) => (
-            <button
-              key={`${hit.name}-${hit.setName}-${hit.number}`}
-              type="button"
-              onClick={() => onSelectHit(hit)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${
-                hit.query === card.query
-                  ? "border-[#7dffe1] text-[#7dffe1]"
-                  : "border-white/10 text-[#93a8a2]"
-              }`}
-            >
-              {hit.setName || hit.name}
-              {hit.catalogPrice ? ` · ${formatMoney(hit.catalogPrice)}` : ""}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="px-5 py-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#93a8a2]">
-            Latest eBay {sales[0]?.source === "active" ? "asks" : "sales"}
-          </p>
-          {ebayUrl ? (
-            <a
-              href={ebayUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-[#e7c37a] underline-offset-2 hover:underline"
-            >
-              Open sold search
-            </a>
-          ) : null}
-        </div>
-
-        {sales.length ? (
-          <ul className="space-y-2">
-            {sales.slice(0, 8).map((sale) => (
-              <li key={`${sale.id}-${sale.url}`}>
-                <a
-                  href={sale.url || ebayUrl || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-3 rounded-2xl border border-white/5 p-2 hover:border-white/15"
-                >
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-black/40">
-                    {sale.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={sale.imageUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{sale.title}</p>
-                    <p className="text-xs text-[#93a8a2]">
-                      {sale.source === "sold"
-                        ? formatSoldDate(sale.soldAt)
-                        : "Active listing"}
-                      {sale.condition ? ` · ${sale.condition}` : ""}
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold text-[#e7c37a]">
-                    {formatMoney(sale.price)}
-                  </p>
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-[#93a8a2]">
-            No parsed comps yet. Use Open sold search to view the latest eBay
-            sale in a new tab.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-[#071016]/80 px-4 py-3">
-      <p className="text-[10px] uppercase tracking-[0.18em] text-[#93a8a2]">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium">{value}</p>
     </div>
   );
 }

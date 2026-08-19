@@ -70,3 +70,41 @@ export const CONDITIONS: { id: CardCondition; label: string; suffix: string }[] 
     { id: "bgs-9.5", label: "BGS 9.5", suffix: "BGS 9.5" },
     { id: "cgc-10", label: "CGC 10", suffix: "CGC 10" },
   ];
+
+/**
+ * A saved card in the on-device collection. Local-first: every post lives in
+ * IndexedDB (or localStorage as a fallback) on the collector's own device.
+ * `ownerId` is the seam for real accounts later — today it is always "local".
+ */
+export interface CollectionPost {
+  id: string;
+  ownerId: string;
+  createdAt: number;
+  updatedAt: number;
+  /** Compressed JPEG data URL of the card photo. */
+  imageDataUrl: string | null;
+  name: string;
+  query: string;
+  category: CardCategory;
+  condition: CardCondition;
+  caption?: string;
+  estimatedValue: number | null;
+  lastSold: number | null;
+  source: PriceSource;
+  likes: number;
+  liked: boolean;
+  ocrText?: string;
+  /** Seeded sample post — dismissible, never counted as a real scan. */
+  demo?: boolean;
+}
+
+export interface CollectionProfile {
+  displayName: string;
+  updatedAt: number;
+}
+
+export interface CollectionTotals {
+  count: number;
+  totalValue: number;
+  pricedCount: number;
+}
